@@ -40,17 +40,53 @@ library(dplyr)
 library(tidyr)
 library(lubridate)
 
+# Read the UFO data and make a copy
 UFOData <- read.csv("ufo_subset.csv")
-
 UFODataClean <- UFOData
 
+# Improve the times for teh UFO data copy
 UFODataClean$datetime <- strptime(UFODataClean$datetime, format = "%Y-%m-%d %H:%M")
 UFODataClean$date_posted <- strptime(UFODataClean$date_posted, format = "%d-%m-%Y")
 
+# Figure out which countries are present, and then create a set for country and state
 table(UFODataClean$country) #identify the list of countries at play. They are all either Australian, Canadian, German, British, or American
-EmptyCountries <- UFODataClean$country=='' #find where the country value is missing
 
 MatchedStateCountry <- unique(UFODataClean[,3:4])
-MatchedStateCountry <- MatchedStateCountry[-which(MatchedStateCountry[,1] == ""|MatchedStateCountry[,2] == ""), ]
+MatchedStateCountry <- MatchedStateCountry[-which(MatchedStateCountry[,1] == ""|MatchedStateCountry[,2] == ""), ] #remove the rows that don't have any data as they are not valid pairs
 # the result is that the states "dc", "sk", and "wa" are shared across 2 different countries
 # there are countries that are not represented: (france), (venezuala), india, thailand, spain, iran, afghanistan, norway, israel, south korea, honduras, sweden, germany, poland, mexico, japan, china, dominican republic, puerto rico, malaysia, bangladesh, u.a.r., italy, kuwait, romania, ukraine, bulgaria, nepal, bolivia, philippines, bahrain, kosovo, cyprus
+
+CountryNames <- read.delim("Country_Names.txt") #make sure you have this file downloaded to the local drive
+
+UFODataClean2 <- UFODataClean
+
+for (i in 1:203){
+  ChosenCountryName <- CountryNames[i,]
+  CountryLocation <-grep(tolower(ChosenCountryName),UFODataClean$city)
+  UFODataClean2$country[CountryLocation] <- ChosenCountryName
+}
+
+# dc state is american if the city has "washington" or "georgetown"
+# sk state has all of the country names taken care of
+# wa state has some city values that are unknown
+USWashingtonState <- c(grep("washington",UFODataClean2$city),grep("georgetown", UFODataClean2$city)) #find all of the washingtons and georgetowns
+EmptyCountries <- which(UFODataClean2$country=='') #find the remaining empty countries
+UFODataClean2$country[intersect(USWashingtonState,EmptyCountries)] <- "United States of America"
+
+
+for (i in 1:65){ # convert empty country codes to country names based on the state IDs
+  ChosenStateName <- MatchedStateCountry[i,1]
+  StateLocation <-grep(tolower(ChosenStateName),UFODataClean2$state)
+  UFODataClean2$country[intersect(StateLocation,EmptyCountries)] <- MatchedStateCountry[i,2]
+}
+
+# Update the country short forms to match the full country names
+UFODataClean2$country[UFODataClean2$country=="us"] <- "United States of America"
+UFODataClean2$country[UFODataClean2$country=="ca"] <- "Canada"
+UFODataClean2$country[UFODataClean2$country=="gb"] <- "Great Britain"
+UFODataClean2$country[UFODataClean2$country=="au"] <- "Australia"
+UFODataClean2$country[UFODataClean2$country=="uk/"] <- "Great Britain"
+
+# After the above processing, 2466 previously empty country locations have been filled in. The missing locations are for those that were mispelled, are US territories, or were taken in places without an obvious country ID, i.e. the I.S.S. or during an airplane flight
+EmptyCountriesCount <- sum(UFODataClean2$country=='')
+
