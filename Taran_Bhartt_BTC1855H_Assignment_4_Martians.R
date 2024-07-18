@@ -101,7 +101,9 @@ UFODataKeyDetails <- UFODataKeyDetails %>% #rename the column headings
     sighting_date = datetime,
     recording_date = date_posted,
     duration_seconds = duration.seconds
-  )
+  )%>%
+  mutate(report_delay = difftime(recording_date,sighting_date,units = "days"))
+# the resulting difference in times are reported in days. Some negative times are less than a day, but may just be a result of the sighting time having hours and seconds, while the reporting time is only the date
 
-
-
+TimeTravellers <- which(UFODataKeyDetails$report_delay<=-1) #determine the rows where the recording of a UFO preceded the sighting
+UFODataKeyDetails <- UFODataKeyDetails[-TimeTravellers,] #remove time travellers
