@@ -87,6 +87,21 @@ UFODataClean2$country[UFODataClean2$country=="gb"] <- "Great Britain"
 UFODataClean2$country[UFODataClean2$country=="au"] <- "Australia"
 UFODataClean2$country[UFODataClean2$country=="uk/"] <- "Great Britain"
 
+# remove hoaxes
+FakeSightings <- (grep("((HOAX??))",UFODataClean2$comments)) #determine the indices with fake sightings
+UFODataClean3 <- UFODataClean2[-FakeSightings,] #remove the rows with fake sightings
+
 # After the above processing, 2466 previously empty country locations have been filled in. The missing locations are for those that were mispelled, are US territories, or were taken in places without an obvious country ID, i.e. the I.S.S. or during an airplane flight
 EmptyCountriesCount <- sum(UFODataClean2$country=='')
+
+
+UFODataKeyDetails <- UFODataClean3[c(1,4:6,9)] #create the data frame that will be used to create the histogram
+UFODataKeyDetails <- UFODataKeyDetails %>% #rename the column headings
+  rename(
+    sighting_date = datetime,
+    recording_date = date_posted,
+    duration_seconds = duration.seconds
+  )
+
+
 
