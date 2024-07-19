@@ -27,9 +27,11 @@
 # Plan
 # 1. Create a data frame using the ufo data
 # 2. look at the data frame to see any obvious issues
-# 3. Create a second array that focusses on the variables 'country', 'shape', 'duration seconds', 'datetime', and 'date_posted'. Edit the titles. Fix data types
+# 3. Create a second array that focusses on the variables 'country', 'shape', 
+#    'duration seconds', 'datetime', and 'date_posted'. Edit the titles. Fix data types
 # 4. NUFORC officials have put "((HOAX??))" in the comments. Screen them out
-# 5. Add another column to the dataset called 'report_delay' that caculates the time difference in days between the date of the sighting and the date it was reported.
+# 5. Add another column to the dataset called 'report_delay' that caculates the 
+#    time difference in days between the date of the sighting and the date it was reported.
 # 6. Remove the rows where the sighting was reported before it happened.
 # 7. Create a table with the average report_delay per country.
 # 8. Create a histogram using the 'duration seconds' column.
@@ -37,7 +39,14 @@
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 # NOTE TO REVIEWER
-# install the following packages
+# install the following packages. You can use the following code:
+# install.packages("dplyr")
+# install.packages("tidyr")
+# install.packages("lubridate")
+# install.packages("graphics")
+# install.packages("sp")
+# install.packages("rworldmap")
+
 library(dplyr)
 library(tidyr)
 library(lubridate)
@@ -51,34 +60,47 @@ library(rworldmap)
 UFOData <- read.csv("ufo_subset.csv")
 UFODataClean <- UFOData
 
-# Improve the times for teh UFO data copy
+# Improve the times for the UFO data copy, converting them from characters to POSIX
 UFODataClean$datetime <- strptime(UFODataClean$datetime, format = "%Y-%m-%d %H:%M")
 UFODataClean$date_posted <- strptime(UFODataClean$date_posted, format = "%d-%m-%Y")
 
-# Figure out which countries are present, and then create a set for country and state
-table(UFODataClean$country) #identify the list of countries at play. They are all either Australian, Canadian, German, British, or American
+# Figure out which countries are present, and then create a vertex that matches 
+# country and state
+MatchedStateCountry <- unique(UFODataClean[,3:4]) #identify the unique 
+# combinations of state and country, including where one is matched to an empty cell
+MatchedStateCountry <- MatchedStateCountry[-which(MatchedStateCountry[,1] == ""|MatchedStateCountry[,2] == ""), ] 
+#remove the rows that don't have any data as they are not valid pairs
 
-MatchedStateCountry <- unique(UFODataClean[,3:4])
-MatchedStateCountry <- MatchedStateCountry[-which(MatchedStateCountry[,1] == ""|MatchedStateCountry[,2] == ""), ] #remove the rows that don't have any data as they are not valid pairs
-# the result is that the states "dc", "sk", and "wa" are shared across 2 different countries
-# there are countries that are not represented: (france), (venezuala), india, thailand, spain, iran, afghanistan, norway, israel, south korea, honduras, sweden, germany, poland, mexico, japan, china, dominican republic, puerto rico, malaysia, bangladesh, u.a.r., italy, kuwait, romania, ukraine, bulgaria, nepal, bolivia, philippines, bahrain, kosovo, cyprus
+# the result is that the states "dc", "sk", and "wa" are shared across 2 
+# different countries
+# there are countries that are not represented: France, Venezuela, India, 
+# Thailand, Spain, Iran, Afghanistan, Norway, Israel, South Korea, Honduras, 
+# Sweden, Germany, Poland, Mexico, Japan, China, Dominican Republic, Malaysia,
+# Bangladesh, Italy, Kuwait, Romania, Ukraine, Bulgaria, Nepal, Bolivia,
+# Philippines, Bahrain, Kosovo, Cyprus, etc.
 
-CountryNames <- read.delim("Country_Names.txt") #make sure you have this file downloaded to the local drive
+# Get the other country names that are not represented in the current country column
+CountryNames <- read.delim("Country_Names.txt")
+# make sure you have this file downloaded to the local drive
+# the countries come from the US State Department. Certain names have been modified
+# to reflect reality, and the way names are presented in the data set
 
-UFODataClean2 <- UFODataClean
+UFODataClean2 <- UFODataClean # create a copy data frame
 
-for (i in 1:203){
+# go through the city column and identify if the country was named
+for (i in 1:203){ #for each of the 203 countries
   ChosenCountryName <- CountryNames[i,]
   CountryLocation <-grep(tolower(ChosenCountryName),UFODataClean$city)
+  # Make the country name in lowercase to match the format of the city column
   UFODataClean2$country[CountryLocation] <- ChosenCountryName
 }
 
-# dc state is american if the city has "washington" or "georgetown"
-# sk state has all of the country names taken care of
-# wa state has some city values that are unknown
-USWashingtonState <- c(grep("washington",UFODataClean2$city),grep("georgetown", UFODataClean2$city)) #find all of the washingtons and georgetowns
+# State Issues--resolve the following:
+# dc state is assigned to both Australia and the USA. At this point, all 
+# Australian dc states have been accounted for
+# Likewise, wa state has had all of its Australian values accounted for
+MatchedStateCountry <- MatchedStateCountry[-c(56,63),]
 EmptyCountries <- which(UFODataClean2$country=='') #find the remaining empty countries
-UFODataClean2$country[intersect(USWashingtonState,EmptyCountries)] <- "United States of America"
 
 
 for (i in 1:65){ # convert empty country codes to country names based on the state IDs
@@ -95,43 +117,65 @@ UFODataClean2$country[UFODataClean2$country=="au"] <- "Australia"
 UFODataClean2$country[UFODataClean2$country=="uk/"] <- "Great Britain"
 
 # remove hoaxes
-FakeSightings <- (grep("((HOAX??))",UFODataClean2$comments)) #determine the indices with fake sightings
-UFODataClean3 <- UFODataClean2[-FakeSightings,] #remove the rows with fake sightings
+FakeSightings <- (grep("((HOAX??))",UFODataClean2$comments)) 
+#determine the indices with fake sightings, which include a "((HOAX??))"
+UFODataClean3 <- UFODataClean2[-FakeSightings,] 
+#remove the rows with fake sightings
 
-# After the above processing, 2466 previously empty country locations have been filled in. The missing locations are for those that were mispelled, are US territories, or were taken in places without an obvious country ID, i.e. the I.S.S. or during an airplane flight
+# After the above processing, 2466 previously empty country locations have been 
+# filled in. The missing locations are for those that were mispelled, are US 
+# territories, or were taken in places without an obvious country ID, 
+# i.e. the I.S.S. or during an airplane flight
+# The number of empty countries is as follows:
 EmptyCountriesCount <- sum(UFODataClean2$country=='')
 
-
-UFODataKeyDetails <- UFODataClean3[c(1,4:6,9)] #create the data frame that will be used to create the histogram
+#create the data frame that will be used to create the histogram
+UFODataKeyDetails <- UFODataClean3[c(1,4:6,9)] 
 UFODataKeyDetails <- UFODataKeyDetails %>% #rename the column headings
   rename(
     sighting_date = datetime,
     recording_date = date_posted,
     duration_seconds = duration.seconds
-  )%>%
+  )%>% #create a new column that reflects the difference in days between UFO 
+       #sighting and reporting
   mutate(report_delay = difftime(recording_date,sighting_date,units = "days"))
-# the resulting difference in times are reported in days. Some negative times are less than a day, but may just be a result of the sighting time having hours and seconds, while the reporting time is only the date
+# the resulting difference in times are reported in days. Some negative times 
+# are less than a day, but may just be a result of the sighting time having hours
+# and seconds, while the reporting time is only the date
 
-TimeTravellers <- which(UFODataKeyDetails$report_delay<=-1) #determine the rows where the recording of a UFO preceded the sighting
-UFODataKeyDetails <- UFODataKeyDetails[-TimeTravellers,] #remove time travellers
+TimeTravellers <- which(UFODataKeyDetails$report_delay<=-1) 
+#determine the rows where the recording of a UFO preceded the sighting
+UFODataKeyDetails <- UFODataKeyDetails[-TimeTravellers,] 
+#remove time travellers
 
 # Create a table for each country's average report delay
-
 UFOReportingDelay <- UFODataKeyDetails%>%
-  group_by(country) %>% #groups by the countries, this does not change the frontend output but modifies the backend
-  summarize(mean_report_delay =mean(report_delay, na.rm = T)) #you need na.rm=T for the average because in row 10193, the United States only has a reporting date
+  group_by(country) %>% 
+  #groups by the countries, this does not change the frontend output but modifies the backend
+  summarize(mean_report_delay =mean(report_delay, na.rm = T))
+#you need na.rm=T for the average because in row 10193, the United States only has a reporting date
 
-MissingCountries <- which(UFOReportingDelay=='')
-UFOReportingDelay <- UFOReportingDelay[-MissingCountries,]
+EmptyCountries <- which(UFOReportingDelay=='')
+#locate which countries don't have a reporting delay
+UFOReportingDelay <- UFOReportingDelay[-EmptyCountries,] 
+#remove these countries from the data frame
 
 UFOReportingDelay <- arrange(UFOReportingDelay, desc(mean_report_delay))
+# arrange the reporting delays in descending order, from longest to shortest
+# this gives the subsequent bar plots some semblance of order
 
 # Plotting UFO sighting delays
+# NOTE TO REVIEWER: the length of the country names requires large margins. In 
+# order for the plots to render correctly, expand the size of the plot window
+# if it is not expanded then the following error will occur:
+# "Error in plot.new() : figure margins too large"
+
 par(mar=c(9,4,4,1)) #set the margins to fit the country names
 barplot(as.numeric(unlist(UFOReportingDelay[,2])), names.arg=unlist(UFOReportingDelay[,1]),las=2,
         ylab = "Days From Sighting",
         main = "UFO Reporting Delay for 105 Countries")
-# Note to reviewer, since 105 countries have been identified by the dataset, not all of the countries show up
+# Note to reviewer, since 105 countries have been identified by the dataset,
+# not all of the countries show up
 
 par(mar=c(7,4,4,1)) #set the margins to fit the country names
 barplot(as.numeric(unlist(UFOReportingDelay[1:20,2])), names.arg=unlist(UFOReportingDelay[1:20,1]),las=2,
@@ -146,20 +190,26 @@ barplot(as.numeric(unlist(UFOReportingDelay[85:105,2])), names.arg=unlist(UFORep
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 # Getting countries from coordinates
-# this section of code uses code from the Stack Overflow topic: "Convert latitude and longitude coordinates to country name in R"
+# this section of code uses code from the Stack Overflow topic: 
+# "Convert latitude and longitude coordinates to country name in R"
 
-coordinateList <- UFODataClean[c(11,10)] #create a coordinate list
+coordinateList <- UFODataClean[c(11,10)] #create a coordinate list from the given
+# latitude and longitudes
 
 # establish the basic map that the coordinates will be measured against
+# this map has 244 countries and territories registered
 countriesSP <- getMap(resolution='low')
 
 # convert the list of points to a SpatialPoints object
 pointsSP = SpatialPoints(coordinateList, proj4string=CRS(proj4string(countriesSP)))  
 
-# use 'over' to get indices of the Polygons object containing each point
+# use 'over' to get indices of the Polygons object containing each SpatialPoints object
+# these indices refer to specific points on the Earth
 indices = over(pointsSP, countriesSP)
 
-# return the ADMIN names of each country, where the ADMIN names are the official country names
+# return the ADMIN names of each country, where the ADMIN names are the official 
+# country names. Note, this dataset separates countries from their territories,
+# i.e. Peurto Rico is separated from the USA
 CountriesFromCoordinates <- indices$ADMIN
 
 UFODataMark2 <- UFODataClean[c(1,8,9)]
@@ -174,36 +224,46 @@ UFODataMark2 <- UFODataMark2 %>% #rename the column headings
     recording_date = date_posted,
   )%>%
   mutate(report_delay = difftime(recording_date,sighting_date,units = "days"))
-# the resulting difference in times are reported in days. Some negative times are less than a day, but may just be a result of the sighting time having hours and seconds, while the reporting time is only the date
+# the resulting difference in times are reported in days. Some negative times 
+# are less than a day, but may just be a result of the sighting time having hours 
+# and seconds, while the reporting time is only the date
 
-TimeTravellers <- which(UFODataMark2$report_delay<=-1) #determine the rows where the recording of a UFO preceded the sighting
+TimeTravellers <- which(UFODataMark2$report_delay<=-1) 
+#determine the rows where the recording of a UFO preceded the sighting
 UFODataMark2 <- UFODataMark2[-TimeTravellers,] #remove time travellers
 
 # Create a table for each country's average report delay
 
-UFOReportingDelay <- UFODataMark2%>%
-  group_by(country) %>% #groups by the countries, this does not change the frontend output but modifies the backend
-  summarize(mean_report_delay =mean(report_delay, na.rm = T)) #you need na.rm=T for the average because in row 10193, the United States only has a reporting date
+UFOReportingDelayMark2 <- UFODataMark2%>%
+  group_by(country) %>% # groups by the countries, this does not change the 
+                        # frontend output but modifies the backend
+  summarize(mean_report_delay =mean(report_delay, na.rm = T)) 
+# you need na.rm=T for the average because in row 10193, 
+# the United States only has a reporting date
 
-MissingCountries <- which(is.na(UFOReportingDelay)) #determine which rows have missing countries
-UFOReportingDelay <- UFOReportingDelay[-MissingCountries,] #remove the missing countries from the data frame
+EmptyCountries <- which(is.na(UFOReportingDelayMark2)) 
+#determine which rows have missing countries
+UFOReportingDelayMark2 <- UFOReportingDelayMark2[-EmptyCountries,] 
+#remove the missing countries from the data frame
 
-UFOReportingDelay <- arrange(UFOReportingDelay, desc(mean_report_delay)) #arrange the data frame from longest reporting delay to shortest reporting delay
+UFOReportingDelayMark2 <- arrange(UFOReportingDelayMark2, desc(mean_report_delay)) 
+#arrange the data frame from longest reporting delay to shortest reporting delay
 
 # Plotting UFO sighting delays
 par(mar=c(9,4,4,1)) #set the margins to fit the country names
-barplot(as.numeric(unlist(UFOReportingDelay[,2])), names.arg=unlist(UFOReportingDelay[,1]),las=2,
+barplot(as.numeric(unlist(UFOReportingDelayMark2[,2])), names.arg=unlist(UFOReportingDelayMark2[,1]),las=2,
         ylab = "Days From Sighting",
-        main = "UFO Reporting Delay for 244 Countries")
-# Note to reviewer, since 244 countries have been identified by the dataset, not all of the countries show up
+        main = "UFO Reporting Delay for 112 Countries & Territories")
+# Note to reviewer, since 112 countries have been identified by the dataset, 
+# not all of the countries show up
 
 par(mar=c(7,4,4,1)) #set the margins to fit the country names
-barplot(as.numeric(unlist(UFOReportingDelay[1:20,2])), names.arg=unlist(UFOReportingDelay[1:20,1]),las=2,
+barplot(as.numeric(unlist(UFOReportingDelayMark2[1:20,2])), names.arg=unlist(UFOReportingDelayMark2[1:20,1]),las=2,
         ylab = "Days From Sighting",
         main = "Top 20 Worst Countries for Prompt UFO Reporting")
 
 par(mar=c(14,4,4,1)) #set the margins to fit the country names
-barplot(as.numeric(unlist(UFOReportingDelay[85:105,2])), names.arg=unlist(UFOReportingDelay[85:105,1]),las=2,
+barplot(as.numeric(unlist(UFOReportingDelayMark2[85:105,2])), names.arg=unlist(UFOReportingDelayMark2[85:105,1]),las=2,
         ylab = "Days From Sighting",
         main = "Top 20 Best Countries for Prompt UFO Reporting")
 
