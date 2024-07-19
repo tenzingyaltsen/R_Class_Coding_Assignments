@@ -34,12 +34,18 @@
 # 7. Create a table with the average report_delay per country.
 # 8. Create a histogram using the 'duration seconds' column.
 
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # NOTE TO REVIEWER
-# install Lubridate
+# install the following packages
 library(dplyr)
 library(tidyr)
 library(lubridate)
 library(graphics)
+library(sp)
+library(rworldmap)
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 # Read the UFO data and make a copy
 UFOData <- read.csv("ufo_subset.csv")
@@ -121,16 +127,84 @@ UFOReportingDelay <- UFOReportingDelay[-MissingCountries,]
 UFOReportingDelay <- arrange(UFOReportingDelay, desc(mean_report_delay))
 
 # Plotting UFO sighting delays
+par(mar=c(9,4,4,1)) #set the margins to fit the country names
 barplot(as.numeric(unlist(UFOReportingDelay[,2])), names.arg=unlist(UFOReportingDelay[,1]),las=2,
         ylab = "Days From Sighting",
         main = "UFO Reporting Delay for 105 Countries")
 # Note to reviewer, since 105 countries have been identified by the dataset, not all of the countries show up
 
+par(mar=c(7,4,4,1)) #set the margins to fit the country names
 barplot(as.numeric(unlist(UFOReportingDelay[1:20,2])), names.arg=unlist(UFOReportingDelay[1:20,1]),las=2,
         ylab = "Days From Sighting",
         main = "Top 20 Worst Countries for Prompt UFO Reporting")
 
+par(mar=c(14,4,4,1)) #set the margins to fit the country names
 barplot(as.numeric(unlist(UFOReportingDelay[85:105,2])), names.arg=unlist(UFOReportingDelay[85:105,1]),las=2,
         ylab = "Days From Sighting",
         main = "Top 20 Best Countries for Prompt UFO Reporting")
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+# Getting countries from coordinates
+# this section of code uses code from the Stack Overflow topic: "Convert latitude and longitude coordinates to country name in R"
+
+coordinateList <- UFODataClean[c(11,10)] #create a coordinate list
+
+# establish the basic map that the coordinates will be measured against
+countriesSP <- getMap(resolution='low')
+
+# convert the list of points to a SpatialPoints object
+pointsSP = SpatialPoints(coordinateList, proj4string=CRS(proj4string(countriesSP)))  
+
+# use 'over' to get indices of the Polygons object containing each point
+indices = over(pointsSP, countriesSP)
+
+# return the ADMIN names of each country, where the ADMIN names are the official country names
+CountriesFromCoordinates <- indices$ADMIN
+
+UFODataMark2 <- UFODataClean[c(1,8,9)]
+UFODataMark2$country <- CountriesFromCoordinates
+
+FakeSightings <- (grep("((HOAX??))",UFODataMark2$comments)) #determine the indices with fake sightings
+UFODataMark2 <- UFODataMark2[-FakeSightings,] #remove the rows with fake sightings
+
+UFODataMark2 <- UFODataMark2 %>% #rename the column headings
+  rename(
+    sighting_date = datetime,
+    recording_date = date_posted,
+  )%>%
+  mutate(report_delay = difftime(recording_date,sighting_date,units = "days"))
+# the resulting difference in times are reported in days. Some negative times are less than a day, but may just be a result of the sighting time having hours and seconds, while the reporting time is only the date
+
+TimeTravellers <- which(UFODataMark2$report_delay<=-1) #determine the rows where the recording of a UFO preceded the sighting
+UFODataMark2 <- UFODataMark2[-TimeTravellers,] #remove time travellers
+
+# Create a table for each country's average report delay
+
+UFOReportingDelay <- UFODataMark2%>%
+  group_by(country) %>% #groups by the countries, this does not change the frontend output but modifies the backend
+  summarize(mean_report_delay =mean(report_delay, na.rm = T)) #you need na.rm=T for the average because in row 10193, the United States only has a reporting date
+
+MissingCountries <- which(is.na(UFOReportingDelay)) #determine which rows have missing countries
+UFOReportingDelay <- UFOReportingDelay[-MissingCountries,] #remove the missing countries from the data frame
+
+UFOReportingDelay <- arrange(UFOReportingDelay, desc(mean_report_delay)) #arrange the data frame from longest reporting delay to shortest reporting delay
+
+# Plotting UFO sighting delays
+par(mar=c(9,4,4,1)) #set the margins to fit the country names
+barplot(as.numeric(unlist(UFOReportingDelay[,2])), names.arg=unlist(UFOReportingDelay[,1]),las=2,
+        ylab = "Days From Sighting",
+        main = "UFO Reporting Delay for 244 Countries")
+# Note to reviewer, since 244 countries have been identified by the dataset, not all of the countries show up
+
+par(mar=c(7,4,4,1)) #set the margins to fit the country names
+barplot(as.numeric(unlist(UFOReportingDelay[1:20,2])), names.arg=unlist(UFOReportingDelay[1:20,1]),las=2,
+        ylab = "Days From Sighting",
+        main = "Top 20 Worst Countries for Prompt UFO Reporting")
+
+par(mar=c(14,4,4,1)) #set the margins to fit the country names
+barplot(as.numeric(unlist(UFOReportingDelay[85:105,2])), names.arg=unlist(UFOReportingDelay[85:105,1]),las=2,
+        ylab = "Days From Sighting",
+        main = "Top 20 Best Countries for Prompt UFO Reporting")
+
 
