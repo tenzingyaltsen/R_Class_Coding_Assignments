@@ -1,3 +1,5 @@
+# CR: <- Indicates a code review comment. 
+
 # Assignment 4 - Martians
 
 # Read the data (ufo_subset.csv) into a dataframe
@@ -10,6 +12,8 @@
 # Create a table with the average report_delay per country.
 # Create a histogram using the 'duration seconds' column.
 
+#' CR: This is helpful to include, especially for getting a glimpse of 
+#' the data prior to cleaning.
 # Data Dictionary:
 # sighting's time: Contains date and time of sighting
 # city: City in which UFO was sighted
@@ -60,9 +64,15 @@ library(rworldmap)
 UFOData <- read.csv("ufo_subset.csv")
 UFODataClean <- UFOData
 
+#' CR: Maybe try using the glimpse() or str() functions to get an overview
+#' of the data prior to honing in on a specific variable.
+
 # Improve the times for the UFO data copy, converting them from characters to POSIX
 UFODataClean$datetime <- strptime(UFODataClean$datetime, format = "%Y-%m-%d %H:%M")
 UFODataClean$date_posted <- strptime(UFODataClean$date_posted, format = "%d-%m-%Y")
+
+#' CR: This is a helpful feature and identifies the issue of ambiguous
+#' "state" (i.e., which country's state).
 
 # Figure out which countries are present, and then create a vertex that matches 
 # country and state
@@ -109,6 +119,9 @@ for (i in 1:65){ # convert empty country codes to country names based on the sta
   UFODataClean2$country[intersect(StateLocation,EmptyCountries)] <- MatchedStateCountry[i,2]
 }
 
+#' CR: Nice step, having the full country name is likely better for the
+#' end viewer.
+
 # Update the country short forms to match the full country names
 UFODataClean2$country[UFODataClean2$country=="us"] <- "United States of America"
 UFODataClean2$country[UFODataClean2$country=="ca"] <- "Canada"
@@ -148,6 +161,8 @@ TimeTravellers <- which(UFODataKeyDetails$report_delay<=-1)
 UFODataKeyDetails <- UFODataKeyDetails[-TimeTravellers,] 
 #remove time travellers
 
+# CR: You create/assign a table here but don't display it to the user.
+
 # Create a table for each country's average report delay
 UFOReportingDelay <- UFODataKeyDetails%>%
   group_by(country) %>% 
@@ -169,6 +184,10 @@ UFOReportingDelay <- arrange(UFOReportingDelay, desc(mean_report_delay))
 # order for the plots to render correctly, expand the size of the plot window
 # if it is not expanded then the following error will occur:
 # "Error in plot.new() : figure margins too large"
+
+#' CR: Nice bar plots! Maybe adjusting the time unit for the y-axis might
+#' help the graphs not be as compressed.
+# CR: What does the par() function do?
 
 par(mar=c(9,4,4,1)) #set the margins to fit the country names
 barplot(as.numeric(unlist(UFOReportingDelay[,2])), names.arg=unlist(UFOReportingDelay[,1]),las=2,
@@ -266,5 +285,3 @@ par(mar=c(14,4,4,1)) #set the margins to fit the country names
 barplot(as.numeric(unlist(UFOReportingDelayMark2[85:105,2])), names.arg=unlist(UFOReportingDelayMark2[85:105,1]),las=2,
         ylab = "Days From Sighting",
         main = "Top 20 Best Countries for Prompt UFO Reporting")
-
-
